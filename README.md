@@ -29,3 +29,6 @@ The installer uses prebuilt files. To produce them yourself:
 - [Surviving system updates](guides/updates.md) — keeping this kernel the one that boots
 - [Undoing the install](guides/uninstall.md) — putting everything back
 - [Other distributions](guides/other-distros.md) — if you are not on Fedora
+
+## Disclaimer 
+This project was developed with AI coding assistant
