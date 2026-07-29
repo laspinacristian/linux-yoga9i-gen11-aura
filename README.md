@@ -15,12 +15,6 @@ It installs the patched kernel, the audio topology files, an ALSA configuration 
 It also sets the screen to its native colour gamut, if you run it from a GNOME session.
 Reboot when it finishes. Run it again whenever a new release comes out.
 
-Add `--hdr-edid` to also install the HDR override. It replaces the panel's EDID with one that advertises HDR, and describes one specific panel — vendor `EDO`, product `EE00QBA63.E`. Nothing else here depends on it.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/laspinacristian/linux-yoga9i-gen11-aura/main/install.sh | sudo bash -s -- --hdr-edid
-```
-
 ## Build it yourself
 
 The installer uses prebuilt files. To produce them yourself:
