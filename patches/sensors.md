@@ -76,12 +76,3 @@ which binds to `HID-SENSOR-INT-020b` and would match this machine's sensor
 exactly. It never loads because renaming the device to that name is the job of
 `CONFIG_HID_SENSOR_CUSTOM_SENSOR`, which Fedora does not enable. Turning it on
 costs one line and buys a number nothing reads.
-
-## No automatic brightness, and no way to get it
-
-There is no ambient light sensor. Not one Linux fails to decode — the complete
-list above is every sensor the hub carries, and none of them measures light.
-`CONFIG_HID_SENSOR_ALS` is built and waiting for a device that does not exist.
-
-Adaptive brightness is therefore impossible on this machine, and no driver,
-firmware or patch will change that.
