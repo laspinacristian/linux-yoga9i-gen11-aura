@@ -51,7 +51,31 @@ If that file isn't there, reinstall the package instead:
 sudo dnf reinstall alsa-ucm
 ```
 
-## 5. Remove the topology files and the firmware
+## 5. Undo the HDR EDID override
+
+Three things to remove: the kernel argument that selects the override, the
+dracut rule that puts the file in the initramfs, and the file itself.
+
+```bash
+sudo grubby --update-kernel=ALL --remove-args="drm.edid_firmware"
+sudo rm -f /etc/dracut.conf.d/edid-override.conf
+sudo rm -f /lib/firmware/edid/yoga-9i-hdr.bin
+```
+
+Check that nothing is left behind, since a stale argument on one boot entry is
+easy to miss:
+
+```bash
+sudo grubby --info=ALL | grep -c edid_firmware      # expect 0
+```
+
+Without the override the panel no longer advertises HDR, so the HDR switch in
+Settings disappears. If your display was in HDR, GNOME falls back to treating
+the screen as sRGB and colours will look oversaturated on this wide-gamut
+panel. Edit `~/.config/monitors.xml` and set `<colormode>sdr-native</colormode>`
+to get accurate colours back, or `default` to accept the oversaturated look.
+
+## 6. Remove the topology files and the firmware
 
 ```bash
 sudo rm -f /lib/firmware/intel/sof-ipc4-tplg/sof-ptl-cs42l43-l0*.tplg
@@ -59,7 +83,7 @@ sudo rm -f /lib/firmware/intel/ish/ish_ptl_53c4ffad_a5d6ef13.bin
 sudo dracut -f --regenerate-all
 ```
 
-## 6. Reboot
+## 7. Reboot
 
 You are back to a stock Fedora system, with no sound, no screen rotation and no
 working brightness keys.

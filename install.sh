@@ -20,6 +20,10 @@ TPLG_DIR="/lib/firmware/intel/sof-ipc4-tplg"
 ISH_DIR="/lib/firmware/intel/ish"
 ISH_FILE="ish_ptl_53c4ffad_a5d6ef13.bin"
 UCM_FILE="/usr/share/alsa/ucm2/sof-soundwire/cs42l43-spk.conf"
+EDID_DIR="/lib/firmware/edid"
+EDID_FILE="yoga-9i-hdr.bin"
+EDID_CONNECTOR="eDP-1"
+DRACUT_CONF="/etc/dracut.conf.d/edid-override.conf"
 
 KERNEL_RPMS=(kernel kernel-core kernel-modules kernel-modules-core kernel-modules-extra)
 TPLG_FILES=(sof-ptl-cs42l43-l0.tplg sof-ptl-cs42l43-l0-2ch.tplg sof-ptl-cs42l43-l0-4ch.tplg)
@@ -74,6 +78,9 @@ fetch "${RAW}/dist/firmware/${ISH_FILE}" "${TMP}/${ISH_FILE}"
 info "cs42l43-spk.conf"
 fetch "${RAW}/dist/ucm/cs42l43-spk.conf" "${TMP}/cs42l43-spk.conf"
 
+info "${EDID_FILE}"
+fetch "${RAW}/dist/edid/${EDID_FILE}" "${TMP}/${EDID_FILE}"
+
 KVER=$(rpm -qp --nosignature --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "${TMP}/kernel-core.rpm")
 [[ -n ${KVER} ]] || die "could not read the kernel version out of kernel-core.rpm"
 
@@ -102,6 +109,20 @@ if [[ -f ${UCM_FILE} ]]; then
 else
     info "alsa-ucm is not installed, skipping"
 fi
+
+say "HDR EDID override"
+# The panel announces its HDR abilities over the AUX channel and not in its
+# EDID, which is the only place the desktop looks. This is that EDID with the
+# two missing CTA blocks appended; the kernel is told to use it instead.
+install -D -m 644 "${TMP}/${EDID_FILE}" "${EDID_DIR}/${EDID_FILE}"
+info "${EDID_DIR}/${EDID_FILE}"
+printf 'install_items+=" %s/%s "\n' "${EDID_DIR}" "${EDID_FILE}" > "${DRACUT_CONF}"
+info "${DRACUT_CONF}"
+# --args replaces an existing drm.edid_firmware= rather than appending a second
+# one, and rewrites /etc/kernel/cmdline so later kernels inherit it too.
+grubby --update-kernel=ALL \
+       --args="drm.edid_firmware=${EDID_CONNECTOR}:edid/${EDID_FILE}"
+info "drm.edid_firmware=${EDID_CONNECTOR}:edid/${EDID_FILE}"
 
 say "Kernel ${KVER}"
 dnf install -y --nogpgcheck "${TMP}"/kernel*.rpm
