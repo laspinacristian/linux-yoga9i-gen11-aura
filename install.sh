@@ -180,7 +180,7 @@ say "Colour mode"
 # this only works when run from inside the desktop, and it has to run as that
 # user rather than as root.
 set_colour_mode() {
-    local sess type state user uid seat conns conn mode scale before
+    local sess type state user uid seat conns conn mode scale src before
 
     command -v gdctl >/dev/null || { info "gdctl not found, skipping"; return; }
 
@@ -241,22 +241,44 @@ set_colour_mode() {
         return
     fi
 
-    before=$(stat -c %Y "$(getent passwd "${user}" | cut -d: -f6)/.config/monitors.xml" 2>/dev/null || echo 0)
+    src="$(getent passwd "${user}" | cut -d: -f6)/.config/monitors.xml"
+    before=$(stat -c %Y "${src}" 2>/dev/null || echo 0)
 
-    if run gdctl set -P -LM "${conn}" --primary --mode "${mode}" \
-                     --scale "${scale}" --color-mode sdr-native >/dev/null 2>&1; then
-        info "${conn} set to sdr-native at ${mode}, scale ${scale}"
-        sync_gdm_config "${user}" "${seat}" "${before}"
-    else
+    # A persistent config always makes mutter ask, and reverts on its own if
+    # nobody answers - see request_persistent_confirmation() in
+    # meta-monitor-manager.c. So say this before the dialog appears, not after.
+    warn "GNOME is about to ask whether to keep this change.
+
+    Click \"Keep Changes\" in the dialog on screen. If nothing is clicked it
+    reverts by itself after 20 seconds and the colours stay oversaturated."
+
+    if ! run gdctl set -P -LM "${conn}" --primary --mode "${mode}" \
+                       --scale "${scale}" --color-mode sdr-native >/dev/null 2>&1; then
         warn "could not set the colour mode; see ${RAW}/guides/color.md"
+        return
     fi
+
+    # The file is only written once the dialog has been confirmed, so waiting
+    # for it is how we tell "kept" from "reverted".
+    info "waiting for the dialog to be answered..."
+    for _ in $(seq 1 60); do
+        if [[ -f ${src} ]] && [[ $(stat -c %Y "${src}") != "${before}" ]]; then
+            info "${conn} set to sdr-native at ${mode}, scale ${scale}"
+            sync_gdm_config "${user}" "${seat}"
+            return
+        fi
+        sleep 0.5
+    done
+
+    warn "the change was not confirmed, so GNOME reverted it.
+    Nothing else was affected. To set it later, see ${RAW}/guides/color.md"
 }
 
 # The login screen runs its own compositor with its own configuration, so it
 # does not inherit any of the above and comes up with the oversaturated
 # default. Give it the same file.
 sync_gdm_config() {
-    local user=$1 seat=$2 before=${3:-} home src dst dir
+    local user=$1 seat=$2 home src dst dir
 
     [[ -n ${seat} ]] || return 0
     dir="/var/lib/gdm/${seat}/config"
@@ -267,14 +289,6 @@ sync_gdm_config() {
     src="${home}/.config/monitors.xml"
     dst="${dir}/monitors.xml"
 
-    # mutter writes the file about two seconds after the change, not on the
-    # way out of gdctl, so copying straight away would take the old contents.
-    if [[ -n ${before} ]]; then
-        for _ in $(seq 1 20); do
-            [[ -f ${src} ]] && [[ $(stat -c %Y "${src}") != "${before}" ]] && break
-            sleep 0.5
-        done
-    fi
     [[ -f ${src} ]] || { info "no monitors.xml to copy, skipping login screen"; return 0; }
 
     install -m 644 "${src}" "${dst}"

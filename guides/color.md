@@ -57,6 +57,13 @@ gdctl set -P -LM eDP-1 --primary --mode 2880x1800@120.000+vrr \
 `--primary` is not decoration: a layout with no primary monitor is rejected
 outright with *Config is missing primary logical*.
 
+**GNOME will then ask whether to keep the change.** Click *Keep Changes*. Any
+persistent configuration triggers that prompt, and if nobody answers it,
+mutter puts the old one back after 20 seconds — so a command that appears to
+have worked quietly undoes itself while you are not looking. `~/.config/monitors.xml`
+is only written once you have confirmed, which is a good way to check that it
+took.
+
 `-P` makes it persistent, `-L` creates the logical monitor, `-M` picks the
 connector. It applies immediately, no logout.
 
