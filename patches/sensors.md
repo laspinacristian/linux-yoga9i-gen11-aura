@@ -45,9 +45,43 @@ matches and the desktop is never told the machine was folded.
 so machines that send a plain number are unaffected, then retries with just the
 low part.
 
-## What is still missing
+## What else is in the hub
 
-Once the sensor hub starts, the accelerometer is the only standard sensor that
-shows up. Whatever else the hub carries is described in a private format Linux
-does not decode. In particular there is no ambient light sensor, so there is no
-automatic brightness.
+Once it starts, the hub presents thirteen sensor collections and Linux binds a
+driver to exactly one of them, the accelerometer. The rest are vendor-defined,
+which the kernel creates devices for but cannot decode.
+
+They are not undecodable by you, though: each one carries its own name in a
+feature report, readable straight from `/dev/hidraw`.
+
+| Reported as | Vendor | Also provided by |
+|---|---|---|
+| Physical Accelerometer ×2 | Bosch BMA422 | — the pair exists to derive the hinge angle |
+| Calibrated Accelerometer | Bosch BMA422 | the `accel_3d` you already have |
+| Simple Orientation | — | the accelerometer, via iio-sensor-proxy |
+| Tablet Mode | Intel GPIO | `lenovo-ymc`, patched above |
+| Lid Closed Detection | Intel GPIO | ACPI `PNP0C0D` |
+| Lid Mode | Intel | ACPI `PNP0C0D` |
+| Hinge | Intel | nothing — this is the only genuinely new reading |
+| Device RF Manager | Lenovo P Sensor | nothing on Linux |
+| Simple DMD | Intel | — |
+
+**None of it is worth enabling.** Everything in that list is either a duplicate
+of something already working or has no consumer. The hinge sensor would report
+the angle in degrees and no Linux desktop reads it; the Lenovo P Sensor drives
+antenna power for SAR limits, which is handled below the operating system.
+
+The kernel even ships a driver for the hinge, `hid-sensor-custom-intel-hinge`,
+which binds to `HID-SENSOR-INT-020b` and would match this machine's sensor
+exactly. It never loads because renaming the device to that name is the job of
+`CONFIG_HID_SENSOR_CUSTOM_SENSOR`, which Fedora does not enable. Turning it on
+costs one line and buys a number nothing reads.
+
+## No automatic brightness, and no way to get it
+
+There is no ambient light sensor. Not one Linux fails to decode — the complete
+list above is every sensor the hub carries, and none of them measures light.
+`CONFIG_HID_SENSOR_ALS` is built and waiting for a device that does not exist.
+
+Adaptive brightness is therefore impossible on this machine, and no driver,
+firmware or patch will change that.
