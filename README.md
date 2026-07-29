@@ -12,7 +12,14 @@ curl -fsSL https://raw.githubusercontent.com/laspinacristian/linux-yoga9i-gen11-
 ```
 
 It installs the patched kernel, the audio topology files, an ALSA configuration and the sensor firmware, then rebuilds the initramfs.
+It also sets the screen to its native colour gamut, if you run it from a GNOME session.
 Reboot when it finishes. Run it again whenever a new release comes out.
+
+Add `--hdr-edid` to also install the HDR override. It replaces the panel's EDID with one that advertises HDR, and describes one specific panel — vendor `EDO`, product `EE00QBA63.E`. Nothing else here depends on it.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/laspinacristian/linux-yoga9i-gen11-aura/main/install.sh | sudo bash -s -- --hdr-edid
+```
 
 ## Build it yourself
 
@@ -24,6 +31,7 @@ The installer uses prebuilt files. To produce them yourself:
 
 ## Other guides
 
+- [Getting the colours right](guides/color.md) — the screen's colour mode, and the login screen
 - [Surviving system updates](guides/updates.md) — keeping this kernel the one that boots
 - [Undoing the install](guides/uninstall.md) — putting everything back
 - [Other distributions](guides/other-distros.md) — if you are not on Fedora
