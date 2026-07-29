@@ -180,7 +180,7 @@ say "Colour mode"
 # this only works when run from inside the desktop, and it has to run as that
 # user rather than as root.
 set_colour_mode() {
-    local sess type state user uid conns conn mode scale
+    local sess type state user uid seat conns conn mode scale before
 
     command -v gdctl >/dev/null || { info "gdctl not found, skipping"; return; }
 
@@ -190,6 +190,7 @@ set_colour_mode() {
         if [[ ${type} == wayland || ${type} == x11 ]] && [[ ${state} == active ]]; then
             user=$(loginctl show-session "${sess}" -p Name --value)
             uid=$(loginctl show-session "${sess}" -p User --value)
+            seat=$(loginctl show-session "${sess}" -p Seat --value)
             break
         fi
     done
@@ -214,6 +215,7 @@ set_colour_mode() {
 
     if run gdctl show -p 2>/dev/null | grep -v supported | grep -q 'color-mode.*sdr-native'; then
         info "${conn} is already on sdr-native"
+        sync_gdm_config "${user}" "${seat}"
         return
     fi
 
@@ -239,12 +241,49 @@ set_colour_mode() {
         return
     fi
 
+    before=$(stat -c %Y "$(getent passwd "${user}" | cut -d: -f6)/.config/monitors.xml" 2>/dev/null || echo 0)
+
     if run gdctl set -P -LM "${conn}" --primary --mode "${mode}" \
                      --scale "${scale}" --color-mode sdr-native >/dev/null 2>&1; then
         info "${conn} set to sdr-native at ${mode}, scale ${scale}"
+        sync_gdm_config "${user}" "${seat}" "${before}"
     else
         warn "could not set the colour mode; see ${RAW}/guides/color.md"
     fi
+}
+
+# The login screen runs its own compositor with its own configuration, so it
+# does not inherit any of the above and comes up with the oversaturated
+# default. Give it the same file.
+sync_gdm_config() {
+    local user=$1 seat=$2 before=${3:-} home src dst dir
+
+    [[ -n ${seat} ]] || return 0
+    dir="/var/lib/gdm/${seat}/config"
+    # Created by GDM itself; if it is not there, GDM has never run here.
+    [[ -d ${dir} ]] || { info "no GDM config directory, skipping login screen"; return 0; }
+
+    home=$(getent passwd "${user}" | cut -d: -f6)
+    src="${home}/.config/monitors.xml"
+    dst="${dir}/monitors.xml"
+
+    # mutter writes the file about two seconds after the change, not on the
+    # way out of gdctl, so copying straight away would take the old contents.
+    if [[ -n ${before} ]]; then
+        for _ in $(seq 1 20); do
+            [[ -f ${src} ]] && [[ $(stat -c %Y "${src}") != "${before}" ]] && break
+            sleep 0.5
+        done
+    fi
+    [[ -f ${src} ]] || { info "no monitors.xml to copy, skipping login screen"; return 0; }
+
+    install -m 644 "${src}" "${dst}"
+    # GDM runs as a systemd dynamic user, so its uid is not fixed and naming it
+    # would be wrong; take whatever owns the directory. Without the SELinux
+    # label GDM cannot read the file and ignores it without saying so.
+    chown --reference="${dir}" "${dst}"
+    command -v restorecon >/dev/null && restorecon "${dst}" 2>/dev/null || true
+    info "login screen configured from ${src}"
 }
 set_colour_mode
 
