@@ -1,0 +1,16 @@
+--- a/ucm2/sof-soundwire/cs42l43-spk.conf
++++ b/ucm2/sof-soundwire/cs42l43-spk.conf
+@@ -17,11 +17,13 @@
+ 	EnableSequence [
+ 		cset "name='cs42l43 Speaker L Input 1' 'DP6RX1'"
+ 		cset "name='cs42l43 Speaker R Input 1' 'DP6RX2'"
++		cset "name='cs42l43 Speaker Digital Switch' 1"
+ 	]
+ 
+ 	DisableSequence [
+ 		cset "name='cs42l43 Speaker L Input 1' 'None'"
+ 		cset "name='cs42l43 Speaker R Input 1' 'None'"
++		cset "name='cs42l43 Speaker Digital Switch' 0"
+ 	]
+ 
+ 

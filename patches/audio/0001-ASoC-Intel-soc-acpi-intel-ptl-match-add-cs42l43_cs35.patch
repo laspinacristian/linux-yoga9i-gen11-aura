@@ -1,0 +1,126 @@
+From 5cf359b702712db0119a30cc721df53da72eaaec Mon Sep 17 00:00:00 2001
+From: Cristian La Spina <cristian.laspina@kernel.srl>
+Date: Mon, 27 Jul 2026 04:30:00 +0200
+Subject: [PATCH] ASoC: Intel: soc-acpi-intel-ptl-match: add cs42l43_cs35l57_l0
+ support
+
+The Lenovo Yoga 9 2-in-1 14IPH11 puts its CS42L43 codec and both CS35L57
+amplifiers on SoundWire link 0, as described by its DSDT:
+
+  sdw:0:0:01fa:4243:01     CS42L43  jack, microphones, two tweeters
+  sdw:0:0:01fa:3557:01:0   CS35L57  left woofer
+  sdw:0:0:01fa:3557:01:1   CS35L57  right woofer
+
+The existing cs42l43 entries describe machines that spread the same
+chips over links 2 and 3, so this laptop matches nothing at all and no
+card is created: speakers, headphone jack and microphones are all
+silent, leaving HDMI as the only output.
+
+Add a match for that layout. The codec drives the two tweeters through
+its own amplifiers while the CS35L57 drive the woofers, so all three
+speaker endpoints have to share a single aggregation group. With
+separate groups each device asks for a DAI link named
+"SDW0-Playback-SmartAmp" and the second registration fails with
+-EEXIST. cs42l43_amp_spkagg_endpoints already places the codec at group
+position 0, so the two amplifiers take positions 1 and 2, following the
+numbered series used for multi-amplifier groups elsewhere.
+
+Assisted-by: Claude:claude-opus-5
+Signed-off-by: Cristian La Spina <cristian.laspina@kernel.srl>
+---
+ .../intel/common/soc-acpi-intel-ptl-match.c   | 58 +++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+
+diff --git a/sound/soc/intel/common/soc-acpi-intel-ptl-match.c b/sound/soc/intel/common/soc-acpi-intel-ptl-match.c
+index f7694b2..b6496dd 100644
+--- a/sound/soc/intel/common/soc-acpi-intel-ptl-match.c
++++ b/sound/soc/intel/common/soc-acpi-intel-ptl-match.c
+@@ -92,6 +92,20 @@ static const struct snd_soc_acpi_endpoint spk_r_endpoint = {
+ 	.group_id = 1,
+ };
+ 
++static const struct snd_soc_acpi_endpoint spk_1_endpoint = {
++	.num = 0,
++	.aggregated = 1,
++	.group_position = 1,
++	.group_id = 1,
++};
++
++static const struct snd_soc_acpi_endpoint spk_2_endpoint = {
++	.num = 0,
++	.aggregated = 1,
++	.group_position = 2,
++	.group_id = 1,
++};
++
+ static const struct snd_soc_acpi_endpoint jack_dmic_endpoints[] = {
+ 	/* Jack Endpoint */
+ 	{
+@@ -184,6 +198,35 @@ static const struct snd_soc_acpi_adr_device cs35l56_2_lr_adr[] = {
+ 	}
+ };
+ 
++/*
++ * Lenovo Yoga 9 2-in-1 14IPH11: the CS42L43 codec and both CS35L57 amplifiers
++ * are on SoundWire link 0, as described by the DSDT. The codec drives the two
++ * tweeters through its own amplifiers, the CS35L57 drive the woofers, so all
++ * three speaker endpoints must share one aggregation group: otherwise each
++ * device asks for a DAI link named "SDW0-Playback-SmartAmp" and the second
++ * registration fails with -EEXIST.
++ */
++static const struct snd_soc_acpi_adr_device cs42l43_cs35l57_0_adr[] = {
++	{
++		.adr = 0x00003001FA424301ull,
++		.num_endpoints = ARRAY_SIZE(cs42l43_amp_spkagg_endpoints),
++		.endpoints = cs42l43_amp_spkagg_endpoints,
++		.name_prefix = "cs42l43"
++	},
++	{
++		.adr = 0x00003001FA355701ull,
++		.num_endpoints = 1,
++		.endpoints = &spk_1_endpoint,
++		.name_prefix = "AMP1"
++	},
++	{
++		.adr = 0x00003101FA355701ull,
++		.num_endpoints = 1,
++		.endpoints = &spk_2_endpoint,
++		.name_prefix = "AMP2"
++	}
++};
++
+ static const struct snd_soc_acpi_adr_device rt711_sdca_0_adr[] = {
+ 	{
+ 		.adr = 0x000030025D071101ull,
+@@ -301,6 +344,15 @@ static const struct snd_soc_acpi_adr_device rt1320_3_group2_adr[] = {
+ 	}
+ };
+ 
++static const struct snd_soc_acpi_link_adr ptl_cs42l43_cs35l57_l0[] = {
++	{
++		.mask = BIT(0),
++		.num_adr = ARRAY_SIZE(cs42l43_cs35l57_0_adr),
++		.adr_d = cs42l43_cs35l57_0_adr,
++	},
++	{}
++};
++
+ static const struct snd_soc_acpi_link_adr ptl_cs42l43_agg_l3_cs35l56_l2[] = {
+ 	{
+ 		.mask = BIT(3),
+@@ -510,6 +562,12 @@ struct snd_soc_acpi_mach snd_soc_acpi_intel_ptl_sdw_machines[] = {
+ 		.sof_tplg_filename = "sof-ptl-rt712-l3-rt1320-l2.tplg",
+ 		.get_function_tplg_files = sof_sdw_get_tplg_files,
+ 	},
++	{
++		.link_mask = BIT(0),
++		.links = ptl_cs42l43_cs35l57_l0,
++		.drv_name = "sof_sdw",
++		.sof_tplg_filename = "sof-ptl-cs42l43-l0.tplg",
++	},
+ 	{
+ 		.link_mask = BIT(2) | BIT(3),
+ 		.links = ptl_cs42l43_agg_l3_cs35l56_l2,
+-- 
+2.55.0
+

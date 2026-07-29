@@ -1,0 +1,61 @@
+From d57eba1059be258850eb004d0f2059e0fa0d5f69 Mon Sep 17 00:00:00 2001
+From: Cristian La Spina <cristian.laspina@kernel.srl>
+Date: Tue, 28 Jul 2026 01:13:40 +0200
+Subject: [PATCH] platform/x86: lenovo-ymc: accept a mode reported in the low
+ byte
+
+The Yoga Mode Control WMI method on the Lenovo Yoga 9 2-in-1 14IPH11
+reports the hinge mode in the low byte and carries unrelated data in the
+upper bits, so none of the values it produces are found in the keymap:
+
+  lenovo-ymc: Unknown key 327681 pressed	0x50001, laptop
+  lenovo-ymc: Unknown key 327683 pressed	0x50003, drawing board
+  lenovo-ymc: Unknown key 327684 pressed	0x50004, tent
+
+SW_TABLET_MODE is never reported as a result, and userspace has no way
+of knowing the machine has been folded.
+
+Retry the lookup with the low byte when the value as received is not in
+the keymap. Machines reporting a bare mode match on the first lookup and
+are unaffected.
+
+Assisted-by: Claude:claude-opus-5
+Signed-off-by: Cristian La Spina <cristian.laspina@kernel.srl>
+---
+ drivers/platform/x86/lenovo/ymc.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/platform/x86/lenovo/ymc.c b/drivers/platform/x86/lenovo/ymc.c
+index 1b73a55..bcb9748 100644
+--- a/drivers/platform/x86/lenovo/ymc.c
++++ b/drivers/platform/x86/lenovo/ymc.c
+@@ -64,7 +64,7 @@ static void lenovo_ymc_notify(struct wmi_device *wdev, union acpi_object *data)
+ 	struct acpi_buffer output = { ACPI_ALLOCATE_BUFFER, NULL };
+ 	union acpi_object *obj;
+ 	acpi_status status;
+-	int code;
++	int code, mode;
+ 
+ 	status = wmi_evaluate_method(LENOVO_YMC_QUERY_GUID,
+ 				LENOVO_YMC_QUERY_INSTANCE,
+@@ -87,7 +87,16 @@ static void lenovo_ymc_notify(struct wmi_device *wdev, union acpi_object *data)
+ 	}
+ 	code = obj->integer.value;
+ 
+-	if (!sparse_keymap_report_event(priv->input_dev, code, 1, true))
++	/*
++	 * Some firmware reports the mode in the low byte and carries unrelated
++	 * data in the upper bits. Look the value up as received first, so
++	 * machines reporting a bare mode are unaffected.
++	 */
++	mode = code;
++	if (!sparse_keymap_entry_from_scancode(priv->input_dev, mode))
++		mode &= 0xff;
++
++	if (!sparse_keymap_report_event(priv->input_dev, mode, 1, true))
+ 		dev_warn(&wdev->dev, "Unknown key %d pressed\n", code);
+ 
+ free_obj:
+-- 
+2.55.0
+
