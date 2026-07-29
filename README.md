@@ -1,6 +1,6 @@
 # Lenovo Yoga 9i 2-in-1 Gen 11 Aura Edition (14IPH11) on Linux
 
-This project aims to make sound, screen rotation, screen brightness and tablet mode work on this 2-in-1 laptop when running a Linux distro.
+This project aims to make sound, tablet mode, screen brightness, rotation and wide-gamut P3 colour profile work on this 2-in-1 laptop when running a Linux distro.
 
 All the technical details can be found in [patches](patches/); hopefully they will get merged upstream in future.\
 Instructions, scripts and pre-built kernel assume Fedora 44 with Secure Boot turned off
